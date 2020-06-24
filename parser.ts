@@ -1,8 +1,11 @@
 import { TokenTypes, Token, Cursor } from './lexer';
+import Serializer from './serializer';
+
+const serializer = new Serializer();
 
 class ParseError extends Error {
-	public constructor(message: string, cursor?: Cursor, expected?: string, got?: string) {
-		super(`${ message }${ cursor ? ` at ${ cursor }` : `` }.${ expected ? ` expected: "${ expected }"` : `` }${ got ? `${ expected ? `,` : `` } got: "${ got }"` : `` }`);
+	public constructor(message: string, cursor?: Cursor, expected?: string | undefined, got?: string | undefined) {
+		super(`${ message }${ cursor ? ` at ${ cursor }` : `` }.${ expected != undefined ? ` expected: "${ expected }"` : `` }${ got != undefined ? `${ expected ? `,` : `` } got: "${ got }"` : `` }`);
 		this.name = 'ParseError';
 	}
 }
@@ -76,7 +79,7 @@ export default class Parser {
 		switch(token.type) {
 			case TokenTypes.OpeningTag:
 				if(this.attributeName != undefined) {
-					throw new ParseError("expected attribute value", token.cursor, "", token.toString());
+					throw new ParseError("expected attribute value", token.cursor, undefined, serializer.serializeToken(token));
 				}
 
 				const element = new Element(token.value);
@@ -85,7 +88,7 @@ export default class Parser {
 					this.root = element;
 				} else {
 					if(this.last == undefined) {
-						throw new ParseError("unexpected non-whitespace after document end", token.cursor, "", token.toString());
+						throw new ParseError("unexpected non-whitespace after document end", token.cursor, undefined, serializer.serializeToken(token));
 					}
 
 					element.parent = this.last;
@@ -100,7 +103,7 @@ export default class Parser {
 
 			case TokenTypes.ClosingTag:
 				if(this.last == undefined) {
-					throw new ParseError("unexpected non-whitespace after document end", token.cursor, "", token.toString());
+					throw new ParseError("unexpected non-whitespace after document end", token.cursor, undefined, serializer.serializeToken(token));
 				}
 
 				if(this.last.name !== token.value) {
@@ -113,7 +116,7 @@ export default class Parser {
 
 			case TokenTypes.AttributeName:
 				if(this.attributeName != undefined) {
-					throw new ParseError("expected attribute value", token.cursor, "", token.toString());
+					throw new ParseError("expected attribute value", token.cursor, undefined, serializer.serializeToken(token));
 				}
 
 				this.attributeName = token.value;
@@ -129,7 +132,7 @@ export default class Parser {
 
 			case TokenTypes.Text:
 				if(this.attributeName != undefined) {
-					throw new ParseError("expected attribute value", token.cursor, "", token.toString());
+					throw new ParseError("expected attribute value", token.cursor, undefined, serializer.serializeToken(token));
 				}
 
 				const text = new Text(token.value);
