@@ -32,10 +32,6 @@ export class Token {
 		this.value = value;
 		this.cursor = cursor;
 	}
-
-	public toString(): string {
-		return `${ this.type }: ${ this.value }`;
-	}
 }
 
 const noop = () => {};
@@ -96,6 +92,7 @@ type StateMachine = { [state in States]: StateActions };
 export default class Lexer {
 	private state: States;
 
+	private tag: string;
 	private value: string;
 	private isClosingTag: boolean;
 	private openingQuote: string;
@@ -141,7 +138,7 @@ export default class Lexer {
 			[States.TagBegin]: {
 				[Actions.Space]: noop,
 				[Actions.Char]: (char: string) => {
-					this.value = char;
+					this.tag = char;
 					this.state = States.TagName;
 				},
 				[Actions.Slash]: () => {
@@ -156,10 +153,9 @@ export default class Lexer {
 					if(this.isClosingTag) {
 						this.state = States.TagEnd;
 					} else {
-						const token = new Token(TokenTypes.OpeningTag, this.value, this.cursor);
+						const token = new Token(TokenTypes.OpeningTag, this.tag, this.cursor);
 
 						this.state = States.AttributeNameStart;
-						this.value = '';
 
 						return token;
 					}
@@ -167,29 +163,28 @@ export default class Lexer {
 				[Actions.GreaterThan]: () => {
 					let token;
 					if(this.isClosingTag) {
-						token = new Token(TokenTypes.ClosingTag, this.value, this.cursor);
+						token = new Token(TokenTypes.ClosingTag, this.tag, this.cursor);
+						this.tag = '';
 					} else {
-						token = new Token(TokenTypes.OpeningTag, this.value, this.cursor);
+						token = new Token(TokenTypes.OpeningTag, this.tag, this.cursor);
 					}
 
 					this.state = States.Data;
-					this.value = '';
 
 					return token;
 				},
 				[Actions.Slash]: () => {
-					const token = new Token(TokenTypes.OpeningTag, this.value, this.cursor);
+					const token = new Token(TokenTypes.OpeningTag, this.tag, this.cursor);
 
 					this.state = States.TagEnd;
-					this.value = '';
 
 					return token;
 				},
 				[Actions.Char]: (char: string) => {
-					this.value += char;
-					if(this.value === '![CDATA[') {
+					this.tag += char;
+					if(this.tag === '![CDATA[') {
+						this.tag = '';
 						this.state = States.CData;
-						this.value = '';
 					}
 				},
 				[Actions.Error]: () => {
@@ -198,10 +193,10 @@ export default class Lexer {
 			},
 			[States.TagEnd]: {
 				[Actions.GreaterThan]: () => {
-					const token = new Token(TokenTypes.ClosingTag, this.value, this.cursor);
+					const token = new Token(TokenTypes.ClosingTag, this.tag, this.cursor);
 
+					this.tag = '';
 					this.state = States.Data;
-					this.value = '';
 
 					return token;
 				},
@@ -215,8 +210,8 @@ export default class Lexer {
 					this.state = States.AttributeName;
 				},
 				[Actions.GreaterThan]: () => {
-					this.state = States.Data;
 					this.value = '';
+					this.state = States.Data;
 				},
 				[Actions.Space]: noop,
 				[Actions.Slash]: () => {
@@ -357,6 +352,7 @@ export default class Lexer {
 						const token = new Token(TokenTypes.AttributeValue, this.value, this.cursor);
 
 						this.isClosingTag = true;
+						this.value = '';
 						this.state = States.TagEnd;
 
 						return token;
@@ -372,6 +368,7 @@ export default class Lexer {
 	private reset(): void {
 		this.state = States.Data;
 
+		this.tag = '';
 		this.value = '';
 		this.openingQuote = '';
 		this.isClosingTag = false;
